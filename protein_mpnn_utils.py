@@ -1054,7 +1054,7 @@ class ProteinMPNN(pl.LightningModule):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-        model.load_state_dict(state_dict)
+        # model.load_state_dict(state_dict)
 
     def forward(self, X, S, mask, chain_M, residue_idx, chain_encoding_all, randn, use_input_decoding_order=False, decoding_order=None):
         """ Graph-conditioned sequence model """
