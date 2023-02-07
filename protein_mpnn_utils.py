@@ -6,7 +6,7 @@ import torch
 from torch import optim
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import random_split, Subset
-
+import pytorch_lightning as pl
 import copy
 import torch.nn as nn
 import torch.nn.functional as F
@@ -1016,10 +1016,11 @@ class ProteinFeatures(nn.Module):
 
 
 
-class ProteinMPNN(nn.Module):
-    def __init__(self, num_letters, node_features, edge_features,
+class ProteinMPNN(pl.LightningModule):
+    def __init__(self, state_dict, num_letters, node_features, edge_features,
         hidden_dim, num_encoder_layers=3, num_decoder_layers=3,
-        vocab=21, k_neighbors=64, augment_eps=0.05, dropout=0.1, ca_only=False):
+        vocab=21, k_neighbors=64, augment_eps=0.05, dropout=0.1): #,ca_only=False):
+
         super(ProteinMPNN, self).__init__()
 
         # Hyperparameters
@@ -1028,11 +1029,11 @@ class ProteinMPNN(nn.Module):
         self.hidden_dim = hidden_dim
 
         # Featurization layers
-        if ca_only:
-            self.features = CA_ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps)
-            self.W_v = nn.Linear(node_features, hidden_dim, bias=True)
-        else:
-            self.features = ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps)
+        # if ca_only:
+        #     self.features = CA_ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps)
+        #     self.W_v = nn.Linear(node_features, hidden_dim, bias=True)
+        # else:
+        self.features = ProteinFeatures(node_features, edge_features, top_k=k_neighbors, augment_eps=augment_eps)
 
         self.W_e = nn.Linear(edge_features, hidden_dim, bias=True)
         self.W_s = nn.Embedding(vocab, hidden_dim)
@@ -1053,6 +1054,7 @@ class ProteinMPNN(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
+        model.load_state_dict(state_dict)
 
     def forward(self, X, S, mask, chain_M, residue_idx, chain_encoding_all, randn, use_input_decoding_order=False, decoding_order=None):
         """ Graph-conditioned sequence model """
@@ -1100,8 +1102,11 @@ class ProteinMPNN(nn.Module):
         return log_probs
 
 
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        return optimizer
 
-    def sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, bias_by_res=None):
+    def predict(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, bias_by_res=None):
         device = X.device
         # Prepare node and edge embeddings
         E, E_idx = self.features(X, mask, residue_idx, chain_encoding_all)

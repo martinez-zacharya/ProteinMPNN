@@ -1,7 +1,7 @@
 import argparse
 import os.path
 
-def main(args):
+def run_mpnn(args):
 
     import json, time, os, sys, glob
     import shutil
@@ -21,10 +21,11 @@ def main(args):
     from protein_mpnn_utils import loss_nll, loss_smoothed, gather_edges, gather_nodes, gather_nodes_t, cat_neighbors_nodes, _scores, _S_to_seq, tied_featurize, parse_PDB, parse_fasta
     from protein_mpnn_utils import StructureDataset, StructureDatasetPDB, ProteinMPNN
 
-    if args.seed:
-        seed=args.seed
-    else:
-        seed=int(np.random.randint(0, high=999, size=1, dtype=int)[0])
+    # if args.seed:
+    #     seed=args.seed
+    # else:
+    #     seed=int(np.random.randint(0, high=999, size=1, dtype=int)[0])
+    seed = 123
 
     torch.manual_seed(seed)
     random.seed(seed)
@@ -33,20 +34,21 @@ def main(args):
     hidden_dim = 128
     num_layers = 3 
   
+    path_to_model_weights = 'vanilla_model_weights/'
 
-    if args.path_to_model_weights:
-        model_folder_path = args.path_to_model_weights
-        if model_folder_path[-1] != '/':
-            model_folder_path = model_folder_path + '/'
-    else: 
-        file_path = os.path.realpath(__file__)
-        k = file_path.rfind("/")
-        if args.ca_only:
-            model_folder_path = file_path[:k] + '/ca_model_weights/'
-        else:
-            model_folder_path = file_path[:k] + '/vanilla_model_weights/'
+    # if args.path_to_model_weights:
+    #     model_folder_path = args.path_to_model_weights
+    #     if model_folder_path[-1] != '/':
+    #         model_folder_path = model_folder_path + '/'
+    # else: 
+    #     file_path = os.path.realpath(__file__)
+    #     k = file_path.rfind("/")
+    #     if args.ca_only:
+    #         model_folder_path = file_path[:k] + '/ca_model_weights/'
+    #     else:
+    #         model_folder_path = file_path[:k] + '/vanilla_model_weights/'
 
-    checkpoint_path = model_folder_path + f'{args.model_name}.pt'
+    checkpoint_path = path_to_model_weights + f'{args.model_name}.pt'
     folder_for_outputs = args.out_folder
     
     NUM_BATCHES = args.num_seq_per_target//args.batch_size
@@ -57,7 +59,8 @@ def main(args):
     alphabet_dict = dict(zip(alphabet, range(21)))    
     print_all = args.suppress_print == 0 
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32)
-    device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+    # device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+    device = torch.device("cuda:0")
     if os.path.isfile(args.chain_id_jsonl):
         with open(args.chain_id_jsonl, 'r') as json_file:
             json_list = list(json_file)
@@ -153,26 +156,26 @@ def main(args):
                     if AA in list(bias_AA_dict.keys()):
                             bias_AAs_np[n] = bias_AA_dict[AA]
     
-    if args.pdb_path:
-        pdb_dict_list = parse_PDB(args.pdb_path, ca_only=args.ca_only)
-        dataset_valid = StructureDatasetPDB(pdb_dict_list, truncate=None, max_length=args.max_length)
-        all_chain_list = [item[-1:] for item in list(pdb_dict_list[0]) if item[:9]=='seq_chain'] #['A','B', 'C',...]
-        if args.pdb_path_chains:
-            designed_chain_list = [str(item) for item in args.pdb_path_chains.split()]
-        else:
-            designed_chain_list = all_chain_list
-        fixed_chain_list = [letter for letter in all_chain_list if letter not in designed_chain_list]
-        chain_id_dict = {}
-        chain_id_dict[pdb_dict_list[0]['name']]= (designed_chain_list, fixed_chain_list)
+    # if args.pdb_path:
+    pdb_dict_list = parse_PDB(args.pdb_path)
+    dataset_valid = StructureDatasetPDB(pdb_dict_list, truncate=None, max_length=args.max_length)
+    all_chain_list = [item[-1:] for item in list(pdb_dict_list[0]) if item[:9]=='seq_chain'] #['A','B', 'C',...]
+    if args.pdb_path_chains:
+        designed_chain_list = [str(item) for item in args.pdb_path_chains.split()]
     else:
-        dataset_valid = StructureDataset(args.jsonl_path, truncate=None, max_length=args.max_length, verbose=print_all)
+        designed_chain_list = all_chain_list
+    fixed_chain_list = [letter for letter in all_chain_list if letter not in designed_chain_list]
+    chain_id_dict = {}
+    chain_id_dict[pdb_dict_list[0]['name']]= (designed_chain_list, fixed_chain_list)
+    # else:
+        # dataset_valid = StructureDataset(args.jsonl_path, truncate=None, max_length=args.max_length, verbose=print_all)
 
     checkpoint = torch.load(checkpoint_path, map_location=device) 
     noise_level_print = checkpoint['noise_level']
-    model = ProteinMPNN(ca_only=args.ca_only, num_letters=21, node_features=hidden_dim, edge_features=hidden_dim, hidden_dim=hidden_dim, num_encoder_layers=num_layers, num_decoder_layers=num_layers, augment_eps=args.backbone_noise, k_neighbors=checkpoint['num_edges'])
-    model.to(device)
+    model = ProteinMPNN(checkpoint['model_state_dict'], ca_only=args.ca_only, num_letters=21, node_features=hidden_dim, edge_features=hidden_dim, hidden_dim=hidden_dim, num_encoder_layers=num_layers, num_decoder_layers=num_layers, augment_eps=args.backbone_noise, k_neighbors=checkpoint['num_edges'])
+    # model.to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    # model.eval()
    
     if print_all:
         print(40*'-')
