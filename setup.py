@@ -2,4 +2,4 @@
 
 from setuptools import setup
 
-setup()
+setup(py_modules = ['run_mpnn'])
