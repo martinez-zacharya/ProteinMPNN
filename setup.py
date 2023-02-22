@@ -2,4 +2,4 @@
 
 from setuptools import setup
 
-setup(py_modules = ['mpnnrun'])
+setup(py_modules = ['mpnnrun', 'mpnnutils'])
