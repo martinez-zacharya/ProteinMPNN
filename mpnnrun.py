@@ -57,7 +57,7 @@ def run_mpnn(args):
         os.makedirs('ProteinMPNN_output')
     folder_for_outputs = 'ProteinMPNN_output'
     
-    NUM_BATCHES = args.num_return_sequences//args.batch_size
+    NUM_BATCHES = int(args.num_return_sequences)//args.batch_size
     BATCH_COPIES = args.batch_size
     temperatures = [float(item) for item in args.temp.split()]
     omit_AAs_list = args.omit_AAs
@@ -218,7 +218,6 @@ def run_mpnn(args):
     if args.save_probs:
         if not os.path.exists(base_folder + 'probs'):
             os.makedirs(base_folder + 'probs') 
-    
     # Timing
     # start_time = time.time()
     total_residues = 0
@@ -323,6 +322,7 @@ def run_mpnn(args):
                 print(f'Generating sequences for: {name_}')
             # t0 = time.time()
             with open(ali_file, 'w') as f:
+                print(ali_file)
                 for temp in temperatures:
                     for j in range(NUM_BATCHES):
                         randn_2 = torch.randn(chain_M.shape, device=X.device)
