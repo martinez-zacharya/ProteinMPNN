@@ -65,7 +65,7 @@ def run_mpnn(args):
     alphabet_dict = dict(zip(alphabet, range(21)))    
     print_all = 1
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32)
-    device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+    device = torch.device("cuda:0" if (os.environ['CUDA_VISIBLE_DEVICES']) else "cpu")
     if os.path.isfile(args.chain_id_jsonl):
         with open(args.chain_id_jsonl, 'r') as json_file:
             json_list = list(json_file)
@@ -306,7 +306,7 @@ def run_mpnn(args):
             np.savez(unconditional_probs_only_file, log_p=concat_log_p, S=S[0,].cpu().numpy(), mask=mask[0,].cpu().numpy(), design_mask=mask_out)
         else:
             randn_1 = torch.randn(chain_M.shape, device=X.device)
-            model.cuda()
+            model = model.to(device)
             log_probs = model(X, S, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_1)
             mask_for_loss = mask*chain_M*chain_M_pos
             scores = _scores(S, log_probs, mask_for_loss) #score only the redesigned part
