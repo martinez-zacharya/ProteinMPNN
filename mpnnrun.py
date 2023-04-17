@@ -65,7 +65,10 @@ def run_mpnn(args):
     alphabet_dict = dict(zip(alphabet, range(21)))    
     print_all = 1
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32)
-    device = torch.device("cuda:0" if (os.environ['CUDA_VISIBLE_DEVICES']) else "cpu")
+    if int(args.GPUs) > 0:
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     if os.path.isfile(args.chain_id_jsonl):
         with open(args.chain_id_jsonl, 'r') as json_file:
             json_list = list(json_file)
