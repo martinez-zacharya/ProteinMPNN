@@ -35,8 +35,10 @@ def run_mpnn(args):
     
     hidden_dim = 128
     num_layers = 3 
-  
-    git_repo = git.Repo('ProteinMPNN', search_parent_directories=True)
+    
+    home_dir = os.path.expanduser("~")
+    cache_dir = os.path.join(home_dir, ".trill_cache")
+    git_repo = git.Repo((os.path.join(cache_dir, 'ProteinMPNN/')), search_parent_directories=True)
     git_root = git_repo.git.rev_parse("--show-toplevel")
     path_to_model_weights = f'{git_root}/vanilla_model_weights/'
 
