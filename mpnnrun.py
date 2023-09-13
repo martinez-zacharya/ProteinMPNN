@@ -54,9 +54,10 @@ def run_mpnn(args):
     #         model_folder_path = file_path[:k] + '/vanilla_model_weights/'
 
     checkpoint_path = path_to_model_weights + f'{args.mpnn_model}.pt'
+    output_path = os.path.join(args.outdir, f'{args.name}_ProteinMPNN_output')
     if not os.path.exists('ProteinMPNN/'):
-        os.makedirs('ProteinMPNN_output')
-    folder_for_outputs = 'ProteinMPNN_output'
+        os.makedirs(output_path)
+    folder_for_outputs = output_path
     
     NUM_BATCHES = int(args.num_return_sequences)//args.batch_size
     BATCH_COPIES = args.batch_size
