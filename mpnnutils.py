@@ -158,6 +158,7 @@ def parse_PDB(path_to_pdb, input_chain_list=None, ca_only=False):
         concat_O = []
         concat_mask = []
         coords_dict = {}
+        chain_labels = {}
         for letter in chain_alphabet:
             if ca_only:
                 sidechain_atoms = ['CA']
@@ -167,6 +168,7 @@ def parse_PDB(path_to_pdb, input_chain_list=None, ca_only=False):
             if type(xyz) != str:
                 concat_seq += seq[0]
                 my_dict['seq_chain_'+letter]=seq[0]
+                chain_labels[letter] = seq[0]
                 coords_dict_chain = {}
                 if ca_only:
                     coords_dict_chain['CA_chain_'+letter]=xyz.tolist()
@@ -181,6 +183,7 @@ def parse_PDB(path_to_pdb, input_chain_list=None, ca_only=False):
         my_dict['name']=biounit[(fi+1):-4]
         my_dict['num_of_chains'] = s
         my_dict['seq'] = concat_seq
+        my_dict['chain_labels'] = chain_labels
         if s <= len(chain_alphabet):
             pdb_dict_list.append(my_dict)
             c+=1

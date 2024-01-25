@@ -2,6 +2,52 @@ import argparse
 import os.path
 import git
 
+import numpy as np
+import json
+
+def get_aa_probabilities_for_a_position(
+        sequence_length: int, residues:dict, alphabet: str = "ACDEFGHIKLMNPQRSTVWYX",
+        minimum_probability:float = 1e-3
+    ):
+        """Get the probabilities for a given amino acid at a given residue
+
+        Args:
+            sequence_length(int): The length of the sequence/chain
+            residues(dict): Dictionary with residue number and amino acid probability at that position
+            alphabet(str): The amino acid alphabet used by ProteinMPNN
+                        "ACDEFGHIKLMNPQRSTVWYX" where X is a gap or unknown amino acid
+            minimum_probability(float): The minimum weight possible. I set this to 1e-3
+                                        so that there is still a small chance that the
+                                        amino acids that weren't given explicit weights would
+                                        still be picked by ProteinMPNN.
+
+        Returns:
+            2D NumPy array of size `sequence_length` by 21
+            where 21 is the number of amino acids (20) plus the "X" spacer a.a.
+            The columns represent the residue at that position in the
+            protein sequence. The row is the likelihood that the amino acid
+            is picked by ProteinMPNN in the new candidate sequences.
+
+            I normalized the likelihoods to sum to 1 so that
+            they would be a probability distribution. However, I don't
+            think ProteinMPNN requires that.
+        """
+
+        alpha_probabilities = np.ones((sequence_length, len(alphabet))) * minimum_probability
+
+        for res in residues:
+            for aa in residues[res]:
+                pos = alphabet.find(aa)
+                alpha_probabilities[int(res) - 1, pos] = residues[res][aa]
+
+        # Normalize to 1 to create probability distribution
+        for idx in range(sequence_length):
+            alpha_probabilities[idx] = alpha_probabilities[idx] / np.sum(
+                alpha_probabilities[idx]
+            )
+
+        return alpha_probabilities
+
 def run_mpnn(args):
 
     import json, time, os, sys, glob
@@ -22,6 +68,7 @@ def run_mpnn(args):
     
     from mpnnutils import loss_nll, loss_smoothed, gather_edges, gather_nodes, gather_nodes_t, cat_neighbors_nodes, _scores, _S_to_seq, tied_featurize, parse_PDB, parse_fasta
     from mpnnutils import StructureDataset, StructureDatasetPDB, ProteinMPNN
+
 
     # if args.seed:
     #     seed=args.seed
@@ -146,13 +193,92 @@ def run_mpnn(args):
 
     
     if os.path.isfile(args.bias_by_res_jsonl):
+
+        # Create bias by residue
+        pdb_dict_list = parse_PDB(args.query)
+
+        bias_per_residue_dict = {}
+
+        """
+        This is not the correct format for the `bias_by_res_jsonl`.
+        Instead, it's easier to pass in just a JSON that
+        has a dictionary where the first level is the chain ID,
+        then the next level are residue positions, and then
+        the next is a list of the amino acid at that residue
+        and the values are the weights for that amino acid
+        at that residue. 
+
+        For example, 
+        {
+            "A": {
+                "7": {
+                    "D": 0,
+                    "E": 45,
+                    "I": 3,
+                    "N": 14,
+                    "R": 2,
+                    "S": 30,
+                    "Y": 17
+                },
+                "24": {
+                    "A": 0,
+                    "E": 40,
+                    "G": 5,
+                    "P": 21,
+                    "R": 2,
+                    "S": 25,
+                    "W": 7,
+                    "Y": 15
+                },
+                "83": {
+                    "E": 40,
+                    "K": 65,
+                    "Q": 25,
+                    "R": 8,
+                    "T": 2
+                },
+            },
+            "D": {
+                "34": {
+                    "D": 3,
+                    "K": 1,
+                    "L": 22,
+                    "S": 1,
+                    "W": 0
+                },
+                "62": {
+                    "G": 2,
+                    "K": 1,
+                    "L": 22,
+                    "R": 78,
+                    "S": 2
+                },
+            }
+        }
+        
+        """
         with open(args.bias_by_res_jsonl, 'r') as json_file:
-            json_list = list(json_file)
+            residue_bias = json.loads(json_file)
+
+        for chain_label, chain_seq in pdb_dict_list['chain_labels']:
+
+            sequence_length = len(chain_seq)
+            residue_probs = get_aa_probabilities_for_a_position(
+                    sequence_length, residue_bias[chain_label], alphabet=alphabet,
+                    minimum_probability= 1e-3
+                )
+            bias_per_residue_dict[chain_label] = residue_probs
+        
+        # with open(args.bias_by_res_jsonl, 'r') as json_file:
+        #     json_list = list(json_file)
     
-        for json_str in json_list:
-            bias_by_res_dict = json.loads(json_str)
+        # for json_str in json_list:
+        #     bias_by_res_dict = json.loads(json_str)
+        
+        bias_by_res_dict[pdb_dict_list['name']] = bias_per_residue_dict[chain_label]
         if print_all:
             print('bias by residue dictionary is loaded')
+
     else:
         if print_all:
             print(40*'-')
